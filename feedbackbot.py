@@ -7,12 +7,12 @@ from slackclient import SlackClient
 BOT_ID = os.environ.get("BOT_ID")
 
 # constants
-AT_BOT = "<@" + BOT_ID + ">:"
-EXAMPLE_COMMAND = "do"
+AT_BOT = "<@" + BOT_ID + ">"
+EXAMPLE_COMMAND = "send feedback"
 
 # instantiate Slack & Twilio clients
 slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
-
+instructors = ["feedback", "kojin","braus","alan","nikolas","shannon","mitchell"]
 
 def handle_command(command, channel):
     """
@@ -20,10 +20,18 @@ def handle_command(command, channel):
         are valid commands. If so, then acts on the commands. If not,
         returns back what it needs for clarification.
     """
-    response = "Not sure what you mean. Use the *" + EXAMPLE_COMMAND + \
-               "* command with numbers, delimited by spaces."
-    if command.startswith(EXAMPLE_COMMAND):
-        response = "Sure...write some more code then I can do that!"
+    response = "Enter your feedback in the format 'instructor_name: feedback_content'"
+    feedback_array = command.split(":")
+    instructor = feedback_array[0]
+    feedback = ":".join(feedback_array[1:])
+    if instructor in instructors:
+        if instructor == "feedback_test":
+            slack_client.api_call("chat.postMessage", channel="#"+instructor,
+                                    text=feedback, as_user=True)
+        else:
+            slack_client.api_call("chat.postMessage", channel="@"+instructor,
+                                    text=feedback, as_user=True)
+        response = "Your feedback is sent to %s :) " % instructor
     slack_client.api_call("chat.postMessage", channel=channel,
                           text=response, as_user=True)
 
