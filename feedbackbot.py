@@ -1,6 +1,17 @@
 import os
 import time
 from slackclient import SlackClient
+import mysql.connector
+
+# Amazon RDS db info
+config = {
+'user': 'admin',
+'password': 'MSbot2016',
+'database': 'feedbacks',
+'host': 'msbot-cluster-1.cluster-cpo2bflrumwo.us-east-1.rds.amazonaws.com',
+'port': '3306'}
+
+cnx = mysql.connector.connect(**config)
 
 
 # starterbot's ID as an environment variable
@@ -28,9 +39,20 @@ def handle_command(command, channel):
         if instructor == "feedback_test":
             slack_client.api_call("chat.postMessage", channel="#"+instructor,
                                     text=feedback, as_user=True)
+            instructor = "#"+instructor
         else:
             slack_client.api_call("chat.postMessage", channel="@"+instructor,
                                     text=feedback, as_user=True)
+            instructor = "@"+instructor
+        slack_client.api_call("channels.info", channel=channel)
+        cursor = cnx.cursor()
+        data = [channel,instructor,feedback,time.time()]
+        data_log = tuple(data)
+        update_log=("INSERT INTO feedbacks (sender,recipient,feedback_text,date_sent) VALUES (%s,%s,%s,%s)")
+        cursor.execute(update_log, data_log)
+        cnx.commit()
+        print "data stored"
+        cursor.close()
         response = "Your feedback is sent to %s :) " % instructor
     slack_client.api_call("chat.postMessage", channel=channel,
                           text=response, as_user=True)
@@ -63,3 +85,4 @@ if __name__ == "__main__":
             time.sleep(READ_WEBSOCKET_DELAY)
     else:
         print("Connection failed. Invalid Slack token or bot ID?")
+cnx.close()
