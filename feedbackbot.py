@@ -2,28 +2,40 @@ import os
 import time
 from slackclient import SlackClient
 import mysql.connector
-
-# Amazon RDS db info
-config = {
-'user': 'admin',
-'password': 'MSbot2016',
-'database': 'feedbacks',
-'host': 'msbot-cluster-1.cluster-cpo2bflrumwo.us-east-1.rds.amazonaws.com',
-'port': '3306'}
-
-cnx = mysql.connector.connect(**config)
-
+import config
 
 # starterbot's ID as an environment variable
 BOT_ID = os.environ.get("BOT_ID")
-
 # constants
 AT_BOT = "<@" + BOT_ID + ">"
 EXAMPLE_COMMAND = "send feedback"
-
 # instantiate Slack & Twilio clients
 slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
-instructors = ["feedback", "kojin","braus","alan","nikolas","shannon","mitchell"]
+# list of instructors eligible for receiving messages
+instructors = ["kojin","braus","alan","nikolas","shannon","mitchell"]
+
+def store_data(sender_name,instructor,feedback):
+    # store feedback
+    cursor = cnx.cursor()
+    data = [sender_name,instructor,feedback,time.strftime('%Y-%m-%d %H:%M:%S')]
+    data_log = tuple(data)
+    update_log=("INSERT INTO feedbacks (sender,recipient,feedback_text,date_sent) VALUES (%s,%s,%s,%s)")
+    cursor.execute(update_log, data_log)
+    cnx.commit()
+    print "data stored"
+    cursor.close()
+
+def get_sender_name(channel):
+    # get all direct messages
+    ims = slack_client.api_call("im.list")["ims"]
+    # check if the feedback is sent from a direct message
+    for im in ims:
+        if channel == im["id"]:
+            # find the user who sent the feedback
+            user = im["user"]
+            name = slack_client.api_call("users.info", user=user)["user"]["name"]
+            return name
+    return ""
 
 def handle_command(command, channel):
     """
@@ -32,31 +44,27 @@ def handle_command(command, channel):
         returns back what it needs for clarification.
     """
     response = "Enter your feedback in the format 'instructor_name: feedback_content'"
+    # separate the command
     feedback_array = command.split(":")
     instructor = feedback_array[0]
     feedback = ":".join(feedback_array[1:])
-    if instructor in instructors:
-        if instructor == "feedback_test":
-            slack_client.api_call("chat.postMessage", channel="#"+instructor,
-                                    text=feedback, as_user=True)
-            instructor = "#"+instructor
-        else:
-            slack_client.api_call("chat.postMessage", channel="@"+instructor,
-                                    text=feedback, as_user=True)
-            instructor = "@"+instructor
-        slack_client.api_call("channels.info", channel=channel)
-        cursor = cnx.cursor()
-        data = [channel,instructor,feedback,time.time()]
-        data_log = tuple(data)
-        update_log=("INSERT INTO feedbacks (sender,recipient,feedback_text,date_sent) VALUES (%s,%s,%s,%s)")
-        cursor.execute(update_log, data_log)
-        cnx.commit()
-        print "data stored"
-        cursor.close()
+
+    instructor_valid = instructor in instructors
+    sender_name = get_sender_name(channel)
+
+    # send and store feedback only if user was found in a direct message
+    if instructor_valid and sender_name != "":
+        # send feedback
+        instructor = "@"+instructor
+        slack_client.api_call("chat.postMessage", channel=instructor,
+                                text=feedback, as_user=True)
+        store_data(sender_name,instructor,feedback)
         response = "Your feedback is sent to %s :) " % instructor
+    else:
+        response = "You can only send feedbacks as direct messages to me."
+    # reply to the sender
     slack_client.api_call("chat.postMessage", channel=channel,
                           text=response, as_user=True)
-
 
 def parse_slack_output(slack_rtm_output):
     """
@@ -73,8 +81,8 @@ def parse_slack_output(slack_rtm_output):
                        output['channel']
     return None, None
 
-
 if __name__ == "__main__":
+    cnx = mysql.connector.connect(**config.db_info) # connect to database
     READ_WEBSOCKET_DELAY = 1 # 1 second delay between reading from firehose
     if slack_client.rtm_connect():
         print("StarterBot connected and running!")
@@ -85,4 +93,4 @@ if __name__ == "__main__":
             time.sleep(READ_WEBSOCKET_DELAY)
     else:
         print("Connection failed. Invalid Slack token or bot ID?")
-cnx.close()
+    cnx.close()
