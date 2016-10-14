@@ -11,7 +11,7 @@ AT_BOT = "<@" + BOT_ID + ">"
 # instantiate Slack & Twilio clients
 slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
 # list of instructors eligible for receiving messages
-instructors = ["tlambrou", "kojin","braus","alan","nikolas","shannon","mitchell"]
+instructors = ["tlambrou", "yhwinnie", "julia", "jake", "david", "kojin","braus","alan","nikolas","shannon","mitchell"]
 
 def store_data(sender_name,instructor,feedback):
     # store feedback
@@ -36,7 +36,7 @@ def get_sender_name(channel):
             return name
     return ""
 
-def handle_command(command, channel):
+def handle_command(command, channel, sender_name):
     """
         Receives commands directed at the bot and determines if they
         are valid commands. If so, then acts on the commands. If not,
@@ -49,20 +49,15 @@ def handle_command(command, channel):
     feedback = ":".join(feedback_array[1:])
 
     instructor_valid = instructor in instructors
-    sender_name = get_sender_name(channel)
 
     # send and store feedback only if user was found in a direct message
     if instructor_valid:
-        if sender_name != "":
-        # send feedback
-            instructor = "@"+instructor
-            template = "You have a new feedback: "
-            slack_client.api_call("chat.postMessage", channel=instructor,
-                                    text=template + feedback, as_user=True)
-            store_data(sender_name,instructor,feedback)
-            response = "Your feedback is sent to %s :) " % instructor
-        else:
-            response = "You can only send feedbacks as direct messages to me."
+        store_data(sender_name,instructor,feedback)
+        instructor = "@"+instructor
+        template = "You have new feedback: "
+        slack_client.api_call("chat.postMessage", channel=instructor,
+                                text=template + feedback, as_user=True)
+        response = "Your feedback is sent to %s :) " % instructor
     # reply to the sender
     slack_client.api_call("chat.postMessage", channel=channel,
                           text=response, as_user=True)
@@ -76,11 +71,28 @@ def parse_slack_output(slack_rtm_output):
     output_list = slack_rtm_output
     if output_list and len(output_list) > 0:
         for output in output_list:
-            if output and 'text' in output and AT_BOT in output['text']:
-                # return text after the @ mention, whitespace removed
-                return output['text'].split(AT_BOT)[1].strip().lower(), \
-                       output['channel']
-    return None, None
+            # get all direct messages
+            ims = slack_client.api_call("im.list")["ims"]
+            # check if the feedback is sent from a direct message
+            print output
+            in_im = False
+            if output and 'text' in output:
+                for im in ims:
+                    if output['channel'] == im["id"]:
+                        sender_name = slack_client.api_call("users.info", user=output['user'])["user"]["name"]
+                        in_im = True
+                if BOT_ID not in output['user']:
+                    if in_im:
+                        return output['text'], \
+                               output['channel'], sender_name
+                if BOT_ID in output['text']:
+                    if in_im:
+                        response = "You don't need to type in @feedback! Just write the feedback directly!"
+                    else:
+                        response = "You can only send feedbacks as direct messages to me."
+                    slack_client.api_call("chat.postMessage", channel=output['channel'],
+                                             text=response, as_user=True)
+    return None, None, None
 
 
 if __name__ == "__main__":
@@ -89,10 +101,11 @@ if __name__ == "__main__":
     if slack_client.rtm_connect():
         print("StarterBot connected and running!")
         while True:
-            command, channel = parse_slack_output(slack_client.rtm_read())
-            if command and channel:
-                print channel
-                handle_command(command, channel)
+            command, channel, sender_name = parse_slack_output(slack_client.rtm_read())
+            print command, channel, sender_name
+            if command and channel and sender_name:
+                # print channel
+                handle_command(command, channel, sender_name)
             time.sleep(READ_WEBSOCKET_DELAY)
     else:
         print("Connection failed. Invalid Slack token or bot ID?")
