@@ -8,11 +8,10 @@ import config
 BOT_ID = os.environ.get("BOT_ID")
 # constants
 AT_BOT = "<@" + BOT_ID + ">"
-EXAMPLE_COMMAND = "send feedback"
 # instantiate Slack & Twilio clients
 slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
 # list of instructors eligible for receiving messages
-instructors = ["kojin","braus","alan","nikolas","shannon","mitchell"]
+instructors = ["tlambrou", "kojin","braus","alan","nikolas","shannon","mitchell"]
 
 def store_data(sender_name,instructor,feedback):
     # store feedback
@@ -53,15 +52,17 @@ def handle_command(command, channel):
     sender_name = get_sender_name(channel)
 
     # send and store feedback only if user was found in a direct message
-    if instructor_valid and sender_name != "":
+    if instructor_valid:
+        if sender_name != "":
         # send feedback
-        instructor = "@"+instructor
-        slack_client.api_call("chat.postMessage", channel=instructor,
-                                text=feedback, as_user=True)
-        store_data(sender_name,instructor,feedback)
-        response = "Your feedback is sent to %s :) " % instructor
-    else:
-        response = "You can only send feedbacks as direct messages to me."
+            instructor = "@"+instructor
+            template = "You have a new feedback: "
+            slack_client.api_call("chat.postMessage", channel=instructor,
+                                    text=template + feedback, as_user=True)
+            store_data(sender_name,instructor,feedback)
+            response = "Your feedback is sent to %s :) " % instructor
+        else:
+            response = "You can only send feedbacks as direct messages to me."
     # reply to the sender
     slack_client.api_call("chat.postMessage", channel=channel,
                           text=response, as_user=True)
@@ -81,6 +82,7 @@ def parse_slack_output(slack_rtm_output):
                        output['channel']
     return None, None
 
+
 if __name__ == "__main__":
     cnx = mysql.connector.connect(**config.db_info) # connect to database
     READ_WEBSOCKET_DELAY = 1 # 1 second delay between reading from firehose
@@ -89,6 +91,7 @@ if __name__ == "__main__":
         while True:
             command, channel = parse_slack_output(slack_client.rtm_read())
             if command and channel:
+                print channel
                 handle_command(command, channel)
             time.sleep(READ_WEBSOCKET_DELAY)
     else:
