@@ -21,7 +21,7 @@ def store_data(sender_name,instructor,feedback):
     update_log=("INSERT INTO feedbacks (sender,recipient,feedback_text,date_sent) VALUES (%s,%s,%s,%s)")
     cursor.execute(update_log, data_log)
     cnx.commit()
-    print "data stored"
+    # print "data stored"
     cursor.close()
 
 def get_sender_name(channel):
@@ -74,7 +74,7 @@ def parse_slack_output(slack_rtm_output):
             # get all direct messages
             ims = slack_client.api_call("im.list")["ims"]
             # check if the feedback is sent from a direct message
-            print output
+            # print output
             in_im = False
             if output and 'text' in output:
                 for im in ims:
@@ -102,7 +102,7 @@ if __name__ == "__main__":
         print("StarterBot connected and running!")
         while True:
             command, channel, sender_name = parse_slack_output(slack_client.rtm_read())
-            print command, channel, sender_name
+            # print command, channel, sender_name
             if command and channel and sender_name:
                 # print channel
                 handle_command(command, channel, sender_name)
