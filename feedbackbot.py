@@ -11,7 +11,7 @@ AT_BOT = "<@" + BOT_ID + ">"
 # instantiate Slack & Twilio clients
 slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
 # list of instructors eligible for receiving messages
-instructors = ["tlambrou", "yhwinnie", "julia", "jake", "david", "kojin","braus","alan","nikolas","shannon","mitchell"]
+# instructors = ["tlambrou", "yhwinnie", "julia", "jake", "david", "kojin","braus","alan","nikolas","shannon","mitchell"]
 
 def store_data(sender_name,instructor,feedback):
     # store feedback
@@ -48,16 +48,16 @@ def handle_command(command, channel, sender_name):
     instructor = feedback_array[0]
     feedback = ":".join(feedback_array[1:])
 
-    instructor_valid = instructor in instructors
+    # instructor_valid = instructor in instructors
 
     # send and store feedback only if user was found in a direct message
-    if instructor_valid:
-        store_data(sender_name,instructor,feedback)
-        instructor = "@"+instructor
-        template = "You have new feedback: "
-        slack_client.api_call("chat.postMessage", channel=instructor,
-                                text=template + feedback, as_user=True)
-        response = "Your feedback is sent to %s :) " % instructor
+    # if instructor_valid:
+    store_data(sender_name,instructor,feedback)
+    instructor = "@"+instructor
+    template = "You have new feedback: "
+    slack_client.api_call("chat.postMessage", channel=instructor,
+                            text=template + feedback, as_user=True)
+    response = "Your feedback is sent to %s :) " % instructor
     # reply to the sender
     slack_client.api_call("chat.postMessage", channel=channel,
                           text=response, as_user=True)
